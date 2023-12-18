@@ -38,7 +38,7 @@ static player_t* cur_player;
 
 
 int* player_position;
-char (*player_name)[MAX_CHARNAME];
+char(*player_name)[MAX_CHARNAME];
 int* player_coin;
 int* player_status;
 char player_statusString[3][MAX_CHARNAME] = { "LIVE", "DIE", "END" };
@@ -186,7 +186,7 @@ void actionNode(int player)
     }
 }
 
-// 이동  
+
 void goForward(int player, int step)
 {
     void* boardPtr;
@@ -263,7 +263,7 @@ int main(int argc, const char* argv[]) {
     int energy;
     int i;
     int initEnergy;
-    
+
     player_position = (int*)malloc(player_nr * sizeof(int));
     player_name = (char(*)[MAX_CHARNAME])malloc(player_nr * MAX_CHARNAME * sizeof(char));
     player_coin = (int*)malloc(player_nr * sizeof(int));
@@ -291,7 +291,7 @@ int main(int argc, const char* argv[]) {
     }
 
     printf("Reading board component......\n");
-    while (fscanf(fp, "%s %i %i %i", name, &type, &credit, &energy) == 4) //read a node parameter set
+    while (fscanf(fp, "%s %i %i %i", &name, &type, &credit, &energy) == 4) //read a node parameter set
     {
         //store the parameter set
         void* boardObj = smmObj_genObject(name, smmObjType_board, type, credit, energy, 0);
@@ -369,71 +369,66 @@ int main(int argc, const char* argv[]) {
 
 
     //3. SM Marble game starts ---------------------------------------------------------------------------------
-     //is anybody graduated?
-    do {
-          int step = 0;
-          int coinResult;
-          char c;
-          int die_result;
-          
-          if (player_status[turn] != PLAYERSTATUS_LIVE) 
-          {
-            turn = (turn + 1) % player_nr; continue;
-          }
-      
+    do //is anybody graduated?
+    {
+        int step = 0;
+        int coinResult;
+        char c;
+        int die_result;
+
         //4-1. initial printing
+        if (player_status[turn] != PLAYERSTATUS_LIVE)
+        {
+            turn = (turn + 1) % player_nr; continue;
+        }
+
         board_printBoardStatus();
         for (i = 0; i < player_nr; i++)
             printPlayerPosition(i);
         printPlayerStatus();
 
         //4-2. die rolling (if not in experiment)
+        board_printBoardStatus();
+
+        for (i = 0; i < player_nr; i++)
+            printPlayerPosition(i);
+        printPlayerStatus();
+        die_result = rolldie(turn);
+
         printf("%s turn!! ", player_name[turn]);
         printf("Press any key to roll a die! \n");
         scanf("%d", &c);
         fflush(stdin);
-        step = rolldie(turn);
-        
+
         goForward(turn, die_result);
-        
+
         //4-3. go forward
         player_position[turn] += step;
         if (player_position[turn] >= N_BOARD)
-           player_position[turn] = N_BOARD - 1;
+            player_position[turn] = N_BOARD - 1;
+
         if (player_position[turn] == N_BOARD - 1)
-           player_status[turn] = PLAYERSTATUS_END; 
-        printf("***Die result : %d*** %s moved to %d!\n", step, player_name[turn], player_position[turn]);
+            player_status[turn] = PLAYERSTATUS_END;
+        printf("***Die result : %d, %s moved to %d!***\n", step, player_name[turn], player_position[turn]);
 
         //4-4. take action at the destination node of the board
         actionNode(turn);
         coinResult = board_getBoardCoin(pos);
         player_coin[turn] += coinResult;
-        printf("%s gained %s coin!\n", player_name[turn], coinResult);
+        printf("You gained %s coin!\n", coinResult);
 
         //4-5. next turn
         turn = (turn + 1) % player_nr;
-        
-        // 4-6. if (모든 플레이어가 한번씩 턴을 돎) 
-        if (turn == 0)
-     { 
-        // 상어 동작 
-        int shark_pos = board_stepShark();
-        printf("Shark moved to %i \n", shark_pos);
-        //check die
-        checkDie();
-     } 
-     turn++;
-  } while(game_end() == 1);
-  
+    }while (game_end() == 0);
     free(cur_player);
-    
+
     free(player_position);
     free(player_name);
     free(player_coin);
     free(player_status);
 
-    system("PAUSE"); 
+    system("PAUSE");
     return 0;
 }
 
-   
+
