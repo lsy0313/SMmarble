@@ -42,10 +42,10 @@ typedef struct smmObject {
 
 }smmObject_t;
 
-
 // 2. 구조체 배열 변수 정의  
 // static smmObject_t smm_node[MAX_NODE];
 // static int smmObj_noNode = 0;
+
 
 #if 0
 static char smmObj_name[MAX_NODE][MAX_CHARNAME];
