@@ -39,7 +39,6 @@ typedef struct smmObject {
     int credit;
     int energy;
     smmObjGrade_e grade;
-
 }smmObject_t;
 
 
@@ -47,14 +46,6 @@ typedef struct smmObject {
 // static smmObject_t smm_node[MAX_NODE];
 // static int smmObj_noNode = 0;
 
-#if 0
-static char smmObj_name[MAX_NODE][MAX_CHARNAME];
-static int smmObj_type[MAX_NODE];
-static int smmObj_credit[MAX_NODE];
-static int smmObj_energy[MAX_NODE];
-
-static int smmObj_noNode = 0;
-#endif
 
 // 3. 관련 함수 변경  
 //object generation

@@ -4,26 +4,16 @@
 //
 //  Created by Juyeop Kim on 2023/11/05.
 //
-#define _CRT_SECURE_NO_WARNINGS
 
 #include <time.h>
 #include <string.h>
 #include "smm_object.h"
 #include "smm_database.h"
 #include "smm_common.h"
-#include "board.h"
 
 #define BOARDFILEPATH "marbleBoardConfig.txt"
 #define FOODFILEPATH "marbleFoodConfig.txt"
 #define FESTFILEPATH "marbleFestivalConfig.txt"
-
-typedef struct player {
-    int energy;
-    int position;
-    char name[MAX_CHARNAME];
-    int accumCredit;
-    int flag_graduate;
-} player_t;
 
 
 //board configuration parameters
@@ -33,15 +23,18 @@ static int festival_nr;
 
 static int player_nr;
 
+
+typedef struct player {
+    int energy;
+    int position;
+    char name[MAX_CHARNAME];
+    int accumCredit;
+    int inExperiment; // is in experiment?
+    int flag_graduate;
+} player_t;
+
 static player_t* cur_player;
 // static player_t cur_[MAX_PLAYER];
-
-
-int* player_position;
-char (*player_name)[MAX_CHARNAME];
-int* player_coin;
-int* player_status;
-char player_statusString[3][MAX_CHARNAME] = { "LIVE", "DIE", "END" };
 
 
 #if 0
@@ -64,14 +57,6 @@ void* findGrade(int player, char* lectureName); //find the grade from the player
 void printGrades(int player); //print all the grade history of the player
 #endif
 
-void opening()
-{
-    printf("****************************************************************\n");
-    printf("***==========================================================***\n");
-    printf("*****               ~~~~~~ SHARK GAME ~~~~~~               *****\n");
-    printf("***==========================================================***\n");
-    printf("****************************************************************\n");
-}
 
 // 성적 확인 
 void printGrades(int player)
@@ -85,39 +70,24 @@ void printGrades(int player)
     }
 }
 
-// 플레이어 위치  
-void printPlayerPosition(int player)
-{
-    int i;
-
-    for (i = 0; i < N_BOARD; i++)
-    {
-        printf("|");
-        if (player_position[player] == i)
-            printf("%c", player_name[player][0]);
-        else
-            printf(" ");
-    } printf("|\n");
-}
-
 
 // 플레이어 상태 (credit, energy, position) 
 void printPlayerStatus(void)
 {
     int i;
-
-    printf("player status ---------------------------------------- \n");
+    
+    printf("\n");
+    printf("player status ------------------------------------------- \n");
     for (i = 0;i < player_nr;i++)
     {
-        printf("%s : credit %i, energy %i, position %i\n",
+        printf("%s : credit %i, energy %i, position %i, in experiment: %s\n",
             cur_player[i].name,
             cur_player[i].accumCredit,
             cur_player[i].energy,
-            cur_player[i].position);
+            cur_player[i].position,
+            cur_player[i].inExperiment ? "Yes" : "No");
 
-        printf("%s : pos %i, coin %i, status %s\n", player_name[i], player_position[i], player_coin[i], player_statusString[player_status[i]]);
-        printPlayerPosition(i);
-    } printf("------------------------------------------------------\n");
+    } printf("---------------------------------------------------------\n");
 }
 
 // 새로운 플레이어 생성 (이름 입력받기, 위치 및 에너지 할당) 
@@ -138,6 +108,7 @@ void generatePlayers(int n, int initEnergy) // generate a new player
         // set energy
         cur_player[i].energy = initEnergy;
         cur_player[i].accumCredit = 0;
+        cur_player[i].inExperiment = 0;
         cur_player[i].flag_graduate = 0;
     }
 }
@@ -151,12 +122,8 @@ int rolldie(int player)
     printf(" Press any key to roll a die (press g to see grade): ");
     c = getchar();
     fflush(stdin);
-
-
-    die_result = (rand() % MAX_DIE + 1);
-    printf("::: Die result: %d :::\n", die_result);
-
-    return die_result; // 6 이하 랜덤 정수
+    
+    return (rand() % MAX_DIE + 1); // 6 이하 랜덤 정수
 }
 
 
@@ -171,15 +138,30 @@ void actionNode(int player)
     switch (type)
     {
         //case lecture:
-    case SMMNODE_TYPE_LECTURE:
-
-        cur_player[player].accumCredit += smmObj_getNodeCredit(boardPtr);
-        cur_player[player].energy -= smmObj_getNodeEnergy(boardPtr);
+        case SMMNODE_TYPE_LECTURE:
+             printf("\n::: Lecture Node : gained %d credits :::\n", smmObj_getNodeCredit(boardPtr));
+             cur_player[player].accumCredit += smmObj_getNodeCredit(boardPtr);
+             cur_player[player].energy -= smmObj_getNodeEnergy(boardPtr);
 
         // grade generation
-        gradePtr = (void*)smmObj_genObject(name, smmObjType_grade, 0, smmObj_getNodeCredit(boardPtr), 0, 0);
-        smmdb_addTail(LISTNO_OFFSET_GRADE + player, gradePtr);
+        //gradePtr = (void*)smmObj_genObject(name, smmObjType_grade, 0, smmObj_getNodeCredit(boardPtr), 0, 0);
+        //smmdb_addTail(LISTNO_OFFSET_GRADE + player, gradePtr);
         break;
+        
+        case SMMNODE_TYPE_RESTAURANT: 
+             printf("\n::: Restaurant Node : gained %d energy :::\n", smmObj_getNodeEnergy(boardPtr));
+             cur_player[player].energy += smmObj_getNodeEnergy(boardPtr); 
+             break;
+             
+        case SMMNODE_TYPE_LABORATORY: 
+             printf("\n::: Laboratory Node : lost %d energy :::\n", smmObj_getNodeEnergy(boardPtr));
+             cur_player[player].energy -= smmObj_getNodeEnergy(boardPtr); 
+             break;
+             
+        case SMMNODE_TYPE_HOME: 
+             printf("\n::: Home Node : gained %d energy :::\n", smmObj_getNodeEnergy(boardPtr));
+             cur_player[player].energy += smmObj_getNodeEnergy(boardPtr); 
+             break;
 
     default:
         break;
@@ -196,63 +178,6 @@ void goForward(int player, int step)
     printf("%s go to node %i (name: %s)\n", cur_player[player].name, cur_player[player].position, smmObj_getNodeName(boardPtr));
 }
 
-// 게임 종료  
-int game_end(void)
-{
-    int i;
-    int flag_end = 1;
-
-    for (i = 0; i < player_nr; i++)
-    {
-        if (player_status[i] == PLAYERSTATUS_LIVE)
-        {
-            flag_end = 0; break;
-        }
-    }
-    return flag_end;
-}
-
-// 살아있는 플레이어 표시 
-int getAlivePlayer(void)
-{
-    int i;
-    int cnt = 0;
-    for (i = 0; i < player_nr; i++)
-    {
-        if (player_status[i] == PLAYERSTATUS_END)
-            cnt++;
-    }
-    return cnt;
-}
-
-// 죽은 플레이어 표시  
-void checkDie(void)
-{
-    int i;
-    for (i = 0; i < player_nr; i++)
-        if (board_getBoardStatus(player_position[i]) == BOARDSTATUS_NOK)
-            player_status[i] = PLAYERSTATUS_DIE;
-}
-
-// 승자 구하기  
-int getWinner(void)
-{
-    int i;
-    int winner = 0;
-    int max_coin = -1;
-
-    for (i = 0; i < player_nr; i++)
-    {
-        if (player_coin[i] > max_coin)
-        {
-            max_coin = player_coin[i];
-            winner = i;
-        }
-    }
-    return winner;
-}
-
-
 
 int main(int argc, const char* argv[]) {
 
@@ -263,23 +188,13 @@ int main(int argc, const char* argv[]) {
     int energy;
     int i;
     int initEnergy;
+    int turn = 0;
     
-    player_position = (int*)malloc(player_nr * sizeof(int));
-    player_name = (char(*)[MAX_CHARNAME])malloc(player_nr * MAX_CHARNAME * sizeof(char));
-    player_coin = (int*)malloc(player_nr * sizeof(int));
-    player_status = (int*)malloc(player_nr * sizeof(int));
-
     board_nr = 0;
     food_nr = 0;
     festival_nr = 0;
 
-    int pos = 0;
-    int turn = 0;
-
     srand(time(NULL));
-
-    // 0. opening
-    opening();
 
     //1. import parameters ---------------------------------------------------------------------------------
     //1-1. boardConfig 
@@ -294,7 +209,7 @@ int main(int argc, const char* argv[]) {
     while (fscanf(fp, "%s %i %i %i", name, &type, &credit, &energy) == 4) //read a node parameter set
     {
         //store the parameter set
-        void* boardObj = smmObj_genObject(name, smmObjType_board, type, credit, energy, 0);
+        void* boardObj = (void*)smmObj_genObject(name, smmObjType_board, type, credit, energy, 0);
         smmdb_addTail(LISTNO_NODE, boardObj);
 
         if (type == SMMNODE_TYPE_HOME)
@@ -314,8 +229,6 @@ int main(int argc, const char* argv[]) {
             smmObj_getNodeType(boardObj), smmObj_getTypeName(smmObj_getNodeType(boardObj)),
             smmObj_getNodeCredit(boardObj), smmObj_getNodeEnergy(boardObj));
     }
-
-    board_initBoard();
 
 #if 0
     //2. food card config 
@@ -370,68 +283,28 @@ int main(int argc, const char* argv[]) {
 
     //3. SM Marble game starts ---------------------------------------------------------------------------------
      //is anybody graduated?
-    do {
-          int step = 0;
-          int coinResult;
-          char c;
-          int die_result;
+    while(1) {
           
-          if (player_status[turn] != PLAYERSTATUS_LIVE) 
-          {
-            turn = (turn + 1) % player_nr; continue;
-          }
+          int die_result;
       
         //4-1. initial printing
-        board_printBoardStatus();
-        for (i = 0; i < player_nr; i++)
-            printPlayerPosition(i);
         printPlayerStatus();
 
         //4-2. die rolling (if not in experiment)
-        printf("%s turn!! ", player_name[turn]);
-        printf("Press any key to roll a die! \n");
-        scanf("%d", &c);
-        fflush(stdin);
-        step = rolldie(turn);
-        
-        goForward(turn, die_result);
+        die_result = rolldie(turn);
         
         //4-3. go forward
-        player_position[turn] += step;
-        if (player_position[turn] >= N_BOARD)
-           player_position[turn] = N_BOARD - 1;
-        if (player_position[turn] == N_BOARD - 1)
-           player_status[turn] = PLAYERSTATUS_END; 
-        printf("***Die result : %d*** %s moved to %d!\n", step, player_name[turn], player_position[turn]);
-
+        goForward(turn, die_result);
+        
         //4-4. take action at the destination node of the board
         actionNode(turn);
-        coinResult = board_getBoardCoin(pos);
-        player_coin[turn] += coinResult;
-        printf("%s gained %s coin!\n", player_name[turn], coinResult);
-
+        
         //4-5. next turn
         turn = (turn + 1) % player_nr;
-        
-        // 4-6. if (모든 플레이어가 한번씩 턴을 돎) 
-        if (turn == 0)
-     { 
-        // 상어 동작 
-        int shark_pos = board_stepShark();
-        printf("Shark moved to %i \n", shark_pos);
-        //check die
-        checkDie();
      } 
-     turn++;
-  } while(game_end() == 1);
   
     free(cur_player);
     
-    free(player_position);
-    free(player_name);
-    free(player_coin);
-    free(player_status);
-
     system("PAUSE"); 
     return 0;
 }
