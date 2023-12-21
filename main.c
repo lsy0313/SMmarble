@@ -30,7 +30,6 @@ typedef struct player {
     char name[MAX_CHARNAME];
     int accumCredit;
     int inExperiment; // is in experiment?
-    int lectureTaken;
     char* grade;
     int flag_graduate;
 } player_t;
@@ -257,7 +256,7 @@ void takeLecture(int player)
     int required_energy = smmObj_getNodeEnergy(boardPtr);
     
     // check having enough energy or haven't taken lecture
-    if (cur_player[player].energy >= required_energy && !cur_player[player].lectureTaken) {
+    if (cur_player[player].energy >= required_energy) {
         
         int choice;
         
@@ -272,7 +271,6 @@ void takeLecture(int player)
             printf("Your grade is: %s\n", grade);
             cur_player[player].accumCredit += smmObj_getNodeCredit(boardPtr);
             cur_player[player].energy -= required_energy;
-            cur_player[player].lectureTaken = 1;
             cur_player[player].grade = grade;
             }
             
@@ -356,9 +354,9 @@ int rolldie(int player)
     int die_result;
     printf(" [ %s's turn ] Press any key to roll a die (press g to see grade): ", cur_player[player].name);
     c = getchar();
+    fflush(stdin);
     if (c == 'g')
        printGrades(player);
-    fflush(stdin);
     
     return (rand() % MAX_DIE + 1);
 }
