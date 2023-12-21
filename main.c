@@ -88,6 +88,7 @@ void printPlayerStatus(void)
             cur_player[i].inExperiment ? "Yes" : "No");
 
     } printf("---------------------------------------------------------\n");
+    printf("**************************************************************\n");
 }
 
 // 새로운 플레이어 생성 (이름 입력받기, 위치 및 에너지 할당) 
@@ -118,7 +119,6 @@ int rolldie(int player)
 {
     char c;
     int die_result;
-    printf("**************************************************************\n");
     printf(" [ %s's turn ] Press any key to roll a die (press g to see grade): ", cur_player[player].name);
     c = getchar();
     fflush(stdin);
@@ -134,6 +134,7 @@ void actionNode(int player)
     int type = smmObj_getNodeType(boardPtr);
     char* name = (char*)smmObj_getNodeName(boardPtr);
     void* gradePtr;
+    int randomIndex;
 
     switch (type)
     {
@@ -164,13 +165,13 @@ void actionNode(int player)
                 int successThreshold = rand() % MAX_DIE + 1;
                 // experiment success
                 if (dice >= successThreshold) {   
-                   printf("Experiment Successed! (success threshold : %d < die result : %d)\n", successThreshold, dice); 
+                   printf("\n~~~Experiment Successed!~~~ (success threshold : %d < die result : %d)\n", successThreshold, dice); 
                    printf("Notice : You can move to the next node\n");
-                   cur_player[player].inExperiment == 0; break;
+                   cur_player[player].inExperiment = 0; break;
                    }
                 // experiment failed
                 else {         
-                   printf("Experiment Failed! (success threshold : %d > die result : %d)\n", successThreshold, dice); 
+                   printf("\n~~~Experiment Failed!~~~ (success threshold : %d > die result : %d)\n", successThreshold, dice); 
                    printf("Notice : You can't move until the next turn\n");
                    cur_player[player].position = 8; break;
                    }     
@@ -191,10 +192,74 @@ void actionNode(int player)
              cur_player[player].position = 8; // move to Laboratory Node
              break;
              
-        
+        case SMMNODE_TYPE_FOODCHANCE:
+             printf("\n::: Food Chance Node :::\n");
+             cur_player[player].energy += readFoodCard();
+             break;
+             
+        case SMMNODE_TYPE_FESTIVAL:
+             printf("\n::: Festival Node :::\n");
+             readFestivalCard();
+             break;
+
     default:
         break;
     }
+}
+
+int readFoodCard() {
+    FILE* fp = fopen(FOODFILEPATH, "r");;
+    char name[MAX_CHARNAME]; 
+    int energy;
+    int i;
+    // Create an index randomly
+    int randomIndex = rand() % 14 + 1;
+    
+    // Move to randomIndex of file
+    for (i = 0; i < randomIndex - 1; i++) {
+        char buffer[256];
+        if (fgets(buffer, sizeof(buffer), fp) == NULL) {
+            printf("Error reading file.\n");
+            fclose(fp);
+            return 1;
+        }
+    }
+    // Read file
+    if (fscanf(fp, "%s %d", name, &energy) == 2) {
+       printf("You ate %s~! Gained %d energy\n", name, energy); 
+       return energy;
+       }
+    else {
+         printf("Error reading data from the file.\n");
+         return 0;
+         }
+    fclose(fp);
+}
+
+int readFestivalCard() {
+    FILE* fp = fopen(FESTFILEPATH, "r");
+    char mission[MAX_CHARNAME]; 
+    int i;
+    
+    // Create an index randomly
+    int randomIndex = rand() % 5 + 1;
+    
+    // Move to randomIndex of file
+    for (i = 0; i < randomIndex - 1; i++) {
+        char buffer[256];
+        if (fgets(buffer, sizeof(buffer), fp) == NULL) {
+            printf("Error reading file.\n");
+            fclose(fp);
+            return 1;
+        }
+    }
+    // Read file
+    if (fscanf(fp, "%s", mission) == 1) 
+       printf("Mission: %s\n", mission); 
+    else 
+       printf("Error reading data from the file.\n");
+         
+    fclose(fp);
 }
 
 // 이동  
@@ -259,7 +324,7 @@ int main(int argc, const char* argv[]) {
             smmObj_getNodeCredit(boardObj), smmObj_getNodeEnergy(boardObj));
     }
 
-#if 0
+
     //2. food card config 
     if ((fp = fopen(FOODFILEPATH, "r")) == NULL)
     {
@@ -271,10 +336,12 @@ int main(int argc, const char* argv[]) {
     while (fscanf(fp, "%s %i", &name, &energy) == 2) //read a food parameter set
     {
         //store the parameter set
+        void* foodObj = (void*)smmObj_genObject(name, smmObjType_card, type, credit, energy, 0);
+        smmdb_addTail(LISTNO_NODE, foodObj);
+        food_nr++;
     }
     fclose(fp);
     printf("Total number of food cards : %i\n", food_nr);
-
 
 
     //3. festival card config 
@@ -285,13 +352,16 @@ int main(int argc, const char* argv[]) {
     }
 
     printf("\n\nReading festival card component......\n");
-    while () //read a festival card string
+    while (fscanf(fp, "%s", &name) == 1) //read a festival card string
     {
+        void* festivalObj = (void*)smmObj_genObject(name, smmObjType_card, type, credit, energy, 0);
+        smmdb_addTail(LISTNO_NODE, festivalObj);
+        festival_nr++;
         //store the parameter set
     }
     fclose(fp);
     printf("Total number of festival cards : %i\n", festival_nr);
-#endif
+
 
 
     //2. Player configuration ---------------------------------------------------------------------------------
@@ -327,10 +397,11 @@ int main(int argc, const char* argv[]) {
         
         //4-3. go forward
            goForward(turn, die_result);
+           
+        //4-4. take action at the destination node of the board
+           actionNode(turn);
         }
         else actionNode(turn);
-        //4-4. take action at the destination node of the board
-        actionNode(turn);
         
         //4-5. next turn
         turn = (turn + 1) % player_nr;
