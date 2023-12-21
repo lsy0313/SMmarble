@@ -4,7 +4,6 @@
 //
 //  Created by Juyeop Kim on 2023/11/05.
 //
-#define _CRT_SECURE_NO_WARNINGS
 
 
 #include "smm_common.h"

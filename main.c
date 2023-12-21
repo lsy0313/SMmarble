@@ -34,14 +34,6 @@ typedef struct player {
 } player_t;
 
 static player_t* cur_player;
-// static player_t cur_[MAX_PLAYER];
-
-
-#if 0
-static int player_energy[MAX_PLAYER];
-static int player_position[MAX_PLAYER];
-static char player_name[MAX_PLAYER][MAX_CHARNAME];
-#endif
 
 
 //function prototypes
@@ -209,8 +201,8 @@ void actionNode(int player)
 
 int readFoodCard() {
     FILE* fp = fopen(FOODFILEPATH, "r");;
-    char name[MAX_CHARNAME]; 
-    int energy;
+    char food_name[MAX_CHARNAME]; 
+    int food_energy;
     int i;
     // Create an index randomly
     int randomIndex = rand() % 14 + 1;
@@ -225,9 +217,9 @@ int readFoodCard() {
         }
     }
     // Read file
-    if (fscanf(fp, "%s %d", name, &energy) == 2) {
-       printf("You ate %s~! Gained %d energy\n", name, energy); 
-       return energy;
+    if (fscanf(fp, "%s %d", food_name, &food_energy) == 2) {
+       printf("You ate %s~! Gained %d energy\n", food_name, food_energy); 
+       return food_energy;
        }
     else {
          printf("Error reading data from the file.\n");
@@ -263,15 +255,40 @@ int readFestivalCard() {
 }
 
 // ÀÌµ¿  
-void goForward(int player, int step)
+void goForward(int player, int step, int initEnergy)
 {
     void* boardPtr;
     cur_player[player].position += step;
+        
+    // passing through Home Node
+    if (cur_player[player].position > 15) {
+       printf("\nNotice : %s passed through home. Gained %d energy\n\n", cur_player[player].name, initEnergy);
+       cur_player[player].energy += initEnergy;   
+       cur_player[player].position = cur_player[player].position - 15;
+       
+       //is anybody graduated?
+       if (cur_player[player].accumCredit >= GRADUATE_CREDIT) {
+          printf("\n*************GAME OVER********************\n");
+          printf("Congratulations!!! Player %s has graduated!\n", cur_player[player].name);
+          cur_player[player].flag_graduate = 1; 
+          }
+       }                     
+                                    
     boardPtr = smmdb_getData(LISTNO_NODE, cur_player[player].position);
-
     printf(" %s go to node %i (name: %s)\n", cur_player[player].name, cur_player[player].position, smmObj_getNodeName(boardPtr));
 }
 
+int isGraduated(void) {
+    int i;
+    
+    for (i = 0; i < player_nr; i++) 
+    {
+        if (cur_player[i].flag_graduate)
+           return 0;
+        else 
+           return 1;
+    }
+}
 
 int main(int argc, const char* argv[]) {
 
@@ -337,7 +354,7 @@ int main(int argc, const char* argv[]) {
     {
         //store the parameter set
         void* foodObj = (void*)smmObj_genObject(name, smmObjType_card, type, credit, energy, 0);
-        smmdb_addTail(LISTNO_NODE, foodObj);
+        smmdb_addTail(LISTNO_FOODCARD, foodObj);
         food_nr++;
     }
     fclose(fp);
@@ -355,7 +372,7 @@ int main(int argc, const char* argv[]) {
     while (fscanf(fp, "%s", &name) == 1) //read a festival card string
     {
         void* festivalObj = (void*)smmObj_genObject(name, smmObjType_card, type, credit, energy, 0);
-        smmdb_addTail(LISTNO_NODE, festivalObj);
+        smmdb_addTail(LISTNO_FESTCARD, festivalObj);
         festival_nr++;
         //store the parameter set
     }
@@ -383,11 +400,11 @@ int main(int argc, const char* argv[]) {
 
 
     //3. SM Marble game starts ---------------------------------------------------------------------------------
-     //is anybody graduated?
+     
     while(1) {
-          
           int die_result;
-      
+          int i;
+                
         //4-1. initial printing
         printPlayerStatus();
 
@@ -396,7 +413,9 @@ int main(int argc, const char* argv[]) {
            die_result = rolldie(turn);
         
         //4-3. go forward
-           goForward(turn, die_result);
+           goForward(turn, die_result, initEnergy);
+           
+           if (isGraduated() == 0) break;
            
         //4-4. take action at the destination node of the board
            actionNode(turn);
