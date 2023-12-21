@@ -119,7 +119,7 @@ int rolldie(int player)
     char c;
     int die_result;
     printf("**************************************************************\n");
-    printf(" Press any key to roll a die (press g to see grade): ");
+    printf(" [ %s's turn ] Press any key to roll a die (press g to see grade): ", cur_player[player].name);
     c = getchar();
     fflush(stdin);
     
@@ -143,26 +143,55 @@ void actionNode(int player)
              cur_player[player].accumCredit += smmObj_getNodeCredit(boardPtr);
              cur_player[player].energy -= smmObj_getNodeEnergy(boardPtr);
 
-        // grade generation
-        //gradePtr = (void*)smmObj_genObject(name, smmObjType_grade, 0, smmObj_getNodeCredit(boardPtr), 0, 0);
-        //smmdb_addTail(LISTNO_OFFSET_GRADE + player, gradePtr);
-        break;
+             //grade generation;
+             gradePtr = (void*)smmObj_genObject(name, smmObjType_grade, 0, smmObj_getNodeCredit(boardPtr), 0, 0);
+             smmdb_addTail(LISTNO_OFFSET_GRADE + player, gradePtr);
+             break;
         
         case SMMNODE_TYPE_RESTAURANT: 
-             printf("\n::: Restaurant Node : gained %d energy :::\n", smmObj_getNodeEnergy(boardPtr));
+             printf("\n::: Restaurant Node : Gained %d energy :::\n", smmObj_getNodeEnergy(boardPtr));
              cur_player[player].energy += smmObj_getNodeEnergy(boardPtr); 
              break;
              
         case SMMNODE_TYPE_LABORATORY: 
-             printf("\n::: Laboratory Node : lost %d energy :::\n", smmObj_getNodeEnergy(boardPtr));
-             cur_player[player].energy -= smmObj_getNodeEnergy(boardPtr); 
+             // in experiment
+             if (cur_player[player].inExperiment == 1) 
+             {
+                printf("\n::: Laboratory Node : Lost %d energy :::\n", smmObj_getNodeEnergy(boardPtr));
+                cur_player[player].energy -= smmObj_getNodeEnergy(boardPtr); 
+                
+                int dice = rolldie(player);
+                int successThreshold = rand() % MAX_DIE + 1;
+                // experiment success
+                if (dice >= successThreshold) {   
+                   printf("Experiment Successed! (success threshold : %d < die result : %d)\n", successThreshold, dice); 
+                   printf("Notice : You can move to the next node\n");
+                   cur_player[player].inExperiment == 0; break;
+                   }
+                // experiment failed
+                else {         
+                   printf("Experiment Failed! (success threshold : %d > die result : %d)\n", successThreshold, dice); 
+                   printf("Notice : You can't move until the next turn\n");
+                   cur_player[player].position = 8; break;
+                   }     
+             }
+             // not in experiment
+             else 
+                  printf("\n::: Laboratory Node : You're not in experiment, so pass :::\n");
              break;
              
         case SMMNODE_TYPE_HOME: 
-             printf("\n::: Home Node : gained %d energy :::\n", smmObj_getNodeEnergy(boardPtr));
+             printf("\n::: Home Node : Gained %d energy :::\n", smmObj_getNodeEnergy(boardPtr));
              cur_player[player].energy += smmObj_getNodeEnergy(boardPtr); 
              break;
-
+             
+        case SMMNODE_TYPE_EXPERIMENT: 
+             printf("\n::: Experiment Node : Go to Laboratory Node :::\n", smmObj_getNodeEnergy(boardPtr));
+             cur_player[player].inExperiment = 1;
+             cur_player[player].position = 8; // move to Laboratory Node
+             break;
+             
+        
     default:
         break;
     }
@@ -175,7 +204,7 @@ void goForward(int player, int step)
     cur_player[player].position += step;
     boardPtr = smmdb_getData(LISTNO_NODE, cur_player[player].position);
 
-    printf("%s go to node %i (name: %s)\n", cur_player[player].name, cur_player[player].position, smmObj_getNodeName(boardPtr));
+    printf(" %s go to node %i (name: %s)\n", cur_player[player].name, cur_player[player].position, smmObj_getNodeName(boardPtr));
 }
 
 
@@ -266,14 +295,16 @@ int main(int argc, const char* argv[]) {
 
 
     //2. Player configuration ---------------------------------------------------------------------------------
-
+    int input;
+    
     do
     {
         //input player number to player_nr
+        printf("\n");
         printf("Input player number: ");
-        scanf("%d", &player_nr);
+        input = scanf("%d", &player_nr);
         fflush(stdin);
-    } while (player_nr < 0 || player_nr > MAX_PLAYER);
+    } while (player_nr < 0 || player_nr > MAX_PLAYER || input == 0);
 
     //플레이어 수만큼 메모리 할당 
     cur_player = (player_t*)malloc(player_nr * sizeof(player_t));
@@ -291,11 +322,13 @@ int main(int argc, const char* argv[]) {
         printPlayerStatus();
 
         //4-2. die rolling (if not in experiment)
-        die_result = rolldie(turn);
+        if (cur_player[turn].inExperiment != 1) {
+           die_result = rolldie(turn);
         
         //4-3. go forward
-        goForward(turn, die_result);
-        
+           goForward(turn, die_result);
+        }
+        else actionNode(turn);
         //4-4. take action at the destination node of the board
         actionNode(turn);
         
