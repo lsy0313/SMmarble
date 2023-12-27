@@ -5,8 +5,8 @@ CPP  = g++.exe
 CC   = gcc.exe
 WINDRES = windres.exe
 RES  = 
-OBJ  = main.o smm_database.o smm_object.o $(RES)
-LINKOBJ  = main.o smm_database.o smm_object.o $(RES)
+OBJ  = main.o smm_database.o smm_object.o board.o $(RES)
+LINKOBJ  = main.o smm_database.o smm_object.o board.o $(RES)
 LIBS =  -L"C:/Dev-Cpp/lib"  
 INCS =  -I"C:/Dev-Cpp/include" 
 CXXINCS =  -I"C:/Dev-Cpp/lib/gcc/mingw32/3.4.2/include"  -I"C:/Dev-Cpp/include/c++/3.4.2/backward"  -I"C:/Dev-Cpp/include/c++/3.4.2/mingw32"  -I"C:/Dev-Cpp/include/c++/3.4.2"  -I"C:/Dev-Cpp/include" 
@@ -34,3 +34,6 @@ smm_database.o: smm_database.c
 
 smm_object.o: smm_object.c
 	$(CC) -c smm_object.c -o smm_object.o $(CFLAGS)
+
+board.o: board.c
+	$(CC) -c board.c -o board.o $(CFLAGS)
